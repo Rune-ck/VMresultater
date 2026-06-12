@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VM 2026 – Tippekonkurranse</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #ffffff;
+    --bg2:       #f5f4f0;
+    --bg3:       #eeedea;
+    --text:      #1a1a18;
+    --text2:     #5f5e5a;
+    --text3:     #888780;
+    --border:    rgba(0,0,0,.10);
+    --border2:   rgba(0,0,0,.18);
+    --radius:    10px;
+    --radius-sm: 6px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:      #1a1a18;
+      --bg2:     #242422;
+      --bg3:     #2e2e2b;
+      --text:    #e8e6df;
+      --text2:   #9c9a92;
+      --text3:   #6b6963;
+      --border:  rgba(255,255,255,.10);
+      --border2: rgba(255,255,255,.18);
+    }
+  }
+
+  body {
+    font-family: system-ui, -apple-system, sans-serif;
+    background: var(--bg2);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 24px 16px 48px;
+  }
+
+  .page { max-width: 860px; margin: 0 auto; }
+
+  h1 {
+    font-size: 20px;
+    font-weight: 500;
+    margin-bottom: 4px;
+  }
+  .subtitle {
+    font-size: 13px;
+    color: var(--text3);
+    margin-bottom: 20px;
+  }
+
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  .card {
+    background: var(--bg);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    position: relative;
+  }
+  .card-rank {
+    font-size: 11px;
+    color: var(--text3);
+    margin-bottom: 2px;
+  }
+  .card-name {
+    font-size: 14px;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .card-pts {
+    font-size: 22px;
+    font-weight: 500;
+    margin-top: 4px;
+  }
+  .card-max {
+    font-size: 11px;
+    color: var(--text3);
+  }
+  .card-bar {
+    height: 3px;
+    background: var(--bg3);
+    border-radius: 2px;
+    margin-top: 8px;
+    overflow: hidden;
+  }
+  .card-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width .6s ease;
+  }
+  .medal { position: absolute; top: 10px; right: 12px; font-size: 16px; }
+
+  .chart-card {
+    background: var(--bg);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 16px 12px;
+    margin-bottom: 16px;
+  }
+  .chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .chart-title { font-size: 14px; font-weight: 500; }
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    color: var(--text2);
+    cursor: pointer;
+    padding: 3px 7px;
+    border-radius: var(--radius-sm);
+    border: 0.5px solid transparent;
+    transition: background .12s, opacity .12s;
+    user-select: none;
+  }
+  .legend-item:hover { background: var(--bg2); }
+  .legend-item.muted { opacity: .3; }
+  .legend-dot {
+    width: 20px;
+    height: 3px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+  .chart-wrap {
+    position: relative;
+    width: 100%;
+    height: 300px;
+  }
+
+  #tooltip {
+    position: fixed;
+    pointer-events: none;
+    background: var(--bg);
+    border: 0.5px solid var(--border2);
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    font-size: 12px;
+    color: var(--text);
+    min-width: 170px;
+    display: none;
+    z-index: 100;
+  }
+  .tt-date { font-size: 11px; color: var(--text2); margin-bottom: 7px; font-weight: 500; }
+  .tt-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    padding: 2px 0;
+  }
+  .tt-left { display: flex; align-items: center; gap: 6px; }
+  .tt-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .tt-name { color: var(--text2); }
+  .tt-right { text-align: right; }
+  .tt-pts { font-weight: 500; }
+  .tt-delta { font-size: 11px; color: var(--text3); }
+
+  .status {
+    font-size: 12px;
+    color: var(--text3);
+    text-align: center;
+    padding: 40px 0;
+  }
+  .error { color: #c0392b; }
+
+  .footer {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--text3);
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  a { color: inherit; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <h1>⚽ VM 2026 – Tippekonkurranse</h1>
+  <p class="subtitle" id="subtitle">Laster data…</p>
+
+  <div id="tooltip">
+    <div class="tt-date" id="tt-date"></div>
+    <div id="tt-rows"></div>
+  </div>
+
+  <div id="cards" class="cards"></div>
+
+  <div class="chart-card">
+    <div class="chart-header">
+      <span class="chart-title">Kumulative poeng</span>
+      <div class="legend" id="legend"></div>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="chart"
+        role="img"
+        aria-label="Linjegraf med kumulative poeng per deltaker gjennom VM 2026">
+      </canvas>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span id="updated"></span>
+    <span>Maks 391 poeng totalt</span>
+  </div>
+
+</div>
+
+<script>
+// ─── KONFIG ───────────────────────────────────────────────────────
+// Lim inn URL-en til din publiserte Apps Script web app her:
+const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbyWAAZl5obPRHd6XIJHbbcRh0Wpud6Hl9KaUXFJzyX3S1pvoA0dHJ2BzjMI0zz8WIqn/exec';
+// Eksempel:
+// const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbxXXX.../exec';
+
+const MAKS_POENG = 391;
+
+const PALETTE = [
+  '#378ADD','#1D9E75','#D85A30','#7F77DD','#BA7517',
+  '#D4537E','#639922','#888780','#185FA5','#0F6E56',
+];
+const MEDALS = ['🥇','🥈','🥉'];
+
+// ─── FARGE-TILORDNING ──────────────────────────────────────────────
+// Tildeles én gang og gjenbrukes konsistent på tvers av kart og linjer
+const fargeMap = {};
+function farge(navn) {
+  if (!fargeMap[navn]) {
+    const idx = Object.keys(fargeMap).length;
+    fargeMap[navn] = PALETTE[idx % PALETTE.length];
+  }
+  return fargeMap[navn];
+}
+
+// ─── HENT DATA ─────────────────────────────────────────────────────
+async function hentData() {
+  if (WEBAPP_URL === 'DIN_WEBAPP_URL_HER') {
+    return demoData();
+  }
+  try {
+    const res  = await fetch(WEBAPP_URL + '?t=' + Date.now());
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return await res.json();
+  } catch (e) {
+    console.error('Feil ved henting:', e);
+    return null;
+  }
+}
+
+// Demo-data vises når WEBAPP_URL ikke er satt
+function demoData() {
+  const start = new Date('2026-06-11');
+  const today = new Date();
+  const days  = Math.min(Math.round((today - start) / 86400000), 38);
+  const deltakere = ['Rune','Kari','Lars','Ingrid','Per'];
+  const seeds = [7,3,11,5,9];
+  const datoer = [];
+  const kumulativt = {};
+  deltakere.forEach(d => { kumulativt[d] = []; });
+
+  for (let i = 0; i <= days; i++) {
+    const d = new Date(start); d.setDate(d.getDate() + i);
+    datoer.push(d.toISOString().slice(0,10));
+    deltakere.forEach((navn, ni) => {
+      const prev = i === 0 ? 0 : kumulativt[navn][i-1];
+      const add  = i === 0 ? 0 : Math.floor(Math.abs(Math.sin(i * seeds[ni]) * 6));
+      kumulativt[navn].push(prev + add);
+    });
+  }
+
+  const rangering = deltakere
+    .map(navn => ({ navn, poeng: kumulativt[navn].at(-1) }))
+    .sort((a,b) => b.poeng - a.poeng);
+
+  return {
+    oppdatert: new Date().toISOString(),
+    startDato: '2026-06-11',
+    datoer, deltakere, kumulativt, rangering,
+    _demo: true,
+  };
+}
+
+// ─── FORMATER DATO ─────────────────────────────────────────────────
+function fmtDato(iso) {
+  const [y,m,d] = iso.split('-').map(Number);
+  return new Date(y,m-1,d).toLocaleDateString('no-NO', { day:'numeric', month:'short' });
+}
+
+// ─── POENGSUMMERT-KORT ─────────────────────────────────────────────
+function byggKort(rangering) {
+  const container = document.getElementById('cards');
+  container.innerHTML = '';
+  rangering.forEach((r, i) => {
+    const pst  = Math.round(r.poeng / MAKS_POENG * 100);
+    const c    = document.createElement('div');
+    c.className = 'card';
+    c.innerHTML = `
+      ${i < 3 ? `<span class="medal">${MEDALS[i]}</span>` : ''}
+      <div class="card-rank">${i+1}. plass</div>
+      <div class="card-name">${r.navn}</div>
+      <div class="card-pts">${r.poeng}<span style="font-size:13px;font-weight:400;color:var(--text3)">p</span></div>
+      <div class="card-max">${pst}% av maks</div>
+      <div class="card-bar">
+        <div class="card-bar-fill" style="width:${pst}%;background:${farge(r.navn)}"></div>
+      </div>`;
+    container.appendChild(c);
+  });
+}
+
+// ─── GRAF ──────────────────────────────────────────────────────────
+let chart = null;
+const muted = new Set();
+
+function byggGraf(data) {
+  const labels   = data.datoer.map(fmtDato);
+  const datasets = data.deltakere.map(navn => ({
+    label:                   navn,
+    data:                    data.kumulativt[navn],
+    borderColor:             farge(navn),
+    backgroundColor:         farge(navn),
+    borderWidth:             2,
+    pointRadius:             0,
+    pointHoverRadius:        6,
+    pointHoverBackgroundColor: farge(navn),
+    pointHoverBorderColor:   getComputedStyle(document.documentElement)
+                               .getPropertyValue('--bg').trim() || '#fff',
+    pointHoverBorderWidth:   2,
+    tension:                 0.3,
+    fill:                    false,
+  }));
+
+  if (chart) chart.destroy();
+
+  chart = new Chart(document.getElementById('chart'), {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive:          true,
+      maintainAspectRatio: false,
+      interaction:         { mode: 'index', intersect: false },
+      plugins: {
+        legend:  { display: false },
+        tooltip: { enabled: false },
+      },
+      scales: {
+        x: {
+          ticks: {
+            color:        '#888780',
+            font:         { size: 11 },
+            maxTicksLimit: Math.min(labels.length, 14),
+            maxRotation:  35,
+          },
+          grid: { color: 'rgba(136,135,128,.10)' },
+        },
+        y: {
+          beginAtZero: true,
+          max: MAKS_POENG,
+          ticks: { color: '#888780', font: { size: 11 }, stepSize: 50 },
+          grid:  { color: 'rgba(136,135,128,.10)' },
+          title: {
+            display: true,
+            text:    'Poeng',
+            color:   '#888780',
+            font:    { size: 11 },
+          },
+        },
+      },
+      onHover: (evt, els) => {
+        document.getElementById('chart').style.cursor =
+          els.length ? 'crosshair' : 'default';
+      },
+    },
+    plugins: [{
+      id: 'crosshair',
+      afterDraw(c) {
+        if (c._hx == null) return;
+        const { ctx, chartArea: { top, bottom } } = c;
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(c._hx, top);
+        ctx.lineTo(c._hx, bottom);
+        ctx.strokeStyle = 'rgba(136,135,128,.3)';
+        ctx.lineWidth   = 1;
+        ctx.setLineDash([4,3]);
+        ctx.stroke();
+        ctx.restore();
+      },
+    }],
+  });
+
+  // Tooltip og crosshair
+  const canvas  = document.getElementById('chart');
+  const tooltip = document.getElementById('tooltip');
+
+  canvas.addEventListener('mousemove', evt => {
+    const pts = chart.getElementsAtEventForMode(evt, 'index', { intersect: false }, false);
+    if (!pts.length) {
+      tooltip.style.display = 'none';
+      chart._hx = null;
+      chart.update('none');
+      return;
+    }
+
+    const idx = pts[0].index;
+    chart._hx = pts[0].element.x;
+    chart.update('none');
+
+    document.getElementById('tt-date').textContent = labels[idx];
+
+    const sorted = data.deltakere
+      .map(navn => ({
+        navn,
+        poeng:  data.kumulativt[navn][idx] || 0,
+        forrige: idx > 0 ? (data.kumulativt[navn][idx-1] || 0) : 0,
+        farge:  farge(navn),
+      }))
+      .sort((a,b) => b.poeng - a.poeng);
+
+    document.getElementById('tt-rows').innerHTML = sorted.map((d,rank) => {
+      const delta = d.poeng - d.forrige;
+      return `<div class="tt-row">
+        <div class="tt-left">
+          <div class="tt-dot" style="background:${d.farge}"></div>
+          <span class="tt-name">${rank+1}. ${d.navn}</span>
+        </div>
+        <div class="tt-right">
+          <span class="tt-pts">${d.poeng}p</span>
+          ${delta > 0 ? `<br><span class="tt-delta">+${delta} i dag</span>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+
+    tooltip.style.display = 'block';
+    const ttW = tooltip.offsetWidth  || 180;
+    const ttH = tooltip.offsetHeight || 160;
+    const pad = 14;
+    let left  = evt.clientX + pad;
+    let top   = evt.clientY - ttH / 2;
+    if (left + ttW > window.innerWidth  - pad) left = evt.clientX - ttW - pad;
+    if (top  < 8)                               top  = 8;
+    if (top + ttH > window.innerHeight - 8)    top  = window.innerHeight - ttH - 8;
+    tooltip.style.left = left + 'px';
+    tooltip.style.top  = top  + 'px';
+  });
+
+  canvas.addEventListener('mouseleave', () => {
+    tooltip.style.display = 'none';
+    chart._hx = null;
+    chart.update('none');
+  });
+
+  // Legende
+  const legend = document.getElementById('legend');
+  legend.innerHTML = '';
+  data.deltakere.forEach((navn, i) => {
+    const item = document.createElement('div');
+    item.className = 'legend-item';
+    item.innerHTML = `<div class="legend-dot" style="background:${farge(navn)}"></div>${navn}`;
+    item.addEventListener('click', () => {
+      if (muted.has(i)) {
+        muted.delete(i);
+        item.classList.remove('muted');
+        chart.show(i);
+      } else {
+        muted.add(i);
+        item.classList.add('muted');
+        chart.hide(i);
+      }
+    });
+    legend.appendChild(item);
+  });
+}
+
+// ─── INIT ──────────────────────────────────────────────────────────
+(async () => {
+  const data = await hentData();
+
+  if (!data) {
+    document.getElementById('subtitle').textContent = '';
+    document.getElementById('cards').innerHTML =
+      '<p class="status error">Kunne ikke laste data. Sjekk at WEBAPP_URL er satt riktig.</p>';
+    return;
+  }
+
+  // Pre-tildel farger i rangert rekkefølge så kort og graf bruker samme farge
+  data.rangering.forEach(r => farge(r.navn));
+
+  byggKort(data.rangering);
+  byggGraf(data);
+
+  const oppdatert = new Date(data.oppdatert).toLocaleString('no-NO', {
+    day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'
+  });
+  document.getElementById('subtitle').textContent =
+    (data._demo ? 'Demo-data – ' : '') + 'Oppdateres automatisk hvert 30. minutt';
+  document.getElementById('updated').textContent = 'Sist oppdatert: ' + oppdatert;
+
+  // Auto-refresh hvert 5. minutt
+  setTimeout(() => location.reload(), 5 * 60 * 1000);
+})();
+</script>
+</body>
+</html>
