@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VM 2026 – Tippekonkurranse</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:      #ffffff;
+    --bg2:     #f5f4f0;
+    --bg3:     #eeedea;
+    --text:    #1a1a18;
+    --text2:   #5f5e5a;
+    --text3:   #888780;
+    --border:  rgba(0,0,0,.10);
+    --border2: rgba(0,0,0,.20);
+    --radius:  10px;
+    --rsm:     6px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:      #1a1a18;
+      --bg2:     #242422;
+      --bg3:     #2e2e2b;
+      --text:    #e8e6df;
+      --text2:   #9c9a92;
+      --text3:   #6b6963;
+      --border:  rgba(255,255,255,.10);
+      --border2: rgba(255,255,255,.20);
+    }
+  }
+
+  body {
+    font-family: system-ui, -apple-system, sans-serif;
+    background: var(--bg2);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 24px 16px 48px;
+  }
+
+  .page { max-width: 1100px; margin: 0 auto; }
+
+  h1 { font-size: 20px; font-weight: 500; margin-bottom: 4px; }
+  .subtitle { font-size: 13px; color: var(--text3); margin-bottom: 16px; }
+
+  /* ── HOVED-LAYOUT: liste til venstre, graf til høyre ── */
+  .main-layout {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    gap: 12px;
+    align-items: start;
+  }
+  @media (max-width: 700px) {
+    .main-layout { grid-template-columns: 1fr; }
+  }
+
+  /* ── KORT (enkeltkolonne-liste) ── */
+  .cards {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .card {
+    background: var(--bg);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+    position: relative;
+    cursor: default;
+    display: grid;
+    grid-template-columns: 24px 1fr auto;
+    grid-template-rows: auto auto auto;
+    column-gap: 8px;
+    align-items: center;
+  }
+  .card-rank  {
+    font-size: 11px; color: var(--text3);
+    grid-column: 1; grid-row: 1;
+    text-align: center;
+  }
+  .card-name  {
+    font-size: 13px; font-weight: 500;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    grid-column: 2; grid-row: 1;
+  }
+  .card-pts   {
+    font-size: 16px; font-weight: 500;
+    grid-column: 3; grid-row: 1;
+    text-align: right;
+    white-space: nowrap;
+  }
+  .card-pts span { font-size: 12px; font-weight: 400; color: var(--text3); }
+  .card-max   { display: none; }
+  .card-bar   {
+    height: 2px; background: var(--bg3); border-radius: 2px;
+    margin-top: 5px; overflow: hidden;
+    grid-column: 2 / 4; grid-row: 2;
+  }
+  .card-bar-fill { height: 100%; border-radius: 2px; }
+  .medal {
+    position: static;
+    font-size: 13px;
+    grid-column: 1; grid-row: 1;
+    text-align: center;
+  }
+
+  /* Kategori-badges */
+  .card-cats {
+    display: flex;
+    gap: 4px;
+    margin-top: 4px;
+    flex-wrap: wrap;
+    grid-column: 2 / 4; grid-row: 3;
+  }
+  .cat-badge {
+    font-size: 10px;
+    color: var(--text3);
+    background: var(--bg2);
+    border-radius: 3px;
+    padding: 1px 4px;
+    white-space: nowrap;
+  }
+
+  /* ── KORT-TOOLTIP ── */
+  .card-tooltip {
+    display: none;
+    position: absolute;
+    left: calc(100% + 10px);
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 200;
+    background: var(--bg);
+    border: 0.5px solid var(--border2);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    min-width: 200px;
+    font-size: 12px;
+    box-shadow: 0 4px 16px rgba(0,0,0,.12);
+    pointer-events: none;
+  }
+  .card:hover .card-tooltip { display: block; }
+  /* Flip to left if near right edge */
+  .cards .card-tooltip { left: calc(100% + 10px); }
+  .card-tooltip-title {
+    font-size: 13px;
+    font-weight: 500;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 0.5px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .card-tooltip-dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  }
+  .card-tooltip-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 3px 0;
+    color: var(--text2);
+  }
+  .card-tooltip-row:last-child {
+    border-top: 0.5px solid var(--border);
+    margin-top: 4px;
+    padding-top: 6px;
+    color: var(--text);
+    font-weight: 500;
+  }
+  .card-tooltip-val { font-weight: 500; color: var(--text); }
+  .card { position: relative; overflow: visible; }
+
+  /* ── GRAF ── */
+  .chart-card {
+    background: var(--bg);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 16px 12px;
+    margin-bottom: 0;
+  }
+  .chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .chart-title { font-size: 14px; font-weight: 500; }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px; }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    color: var(--text2);
+    cursor: pointer;
+    padding: 3px 7px;
+    border-radius: var(--rsm);
+    transition: background .12s, opacity .12s;
+    user-select: none;
+  }
+  .legend-item:hover { background: var(--bg2); }
+  .legend-item.muted { opacity: .3; }
+  .legend-dot { width: 20px; height: 3px; border-radius: 2px; flex-shrink: 0; }
+  .chart-wrap { position: relative; width: 100%; height: 480px; }
+
+  /* ── TOOLTIP ── */
+  #tooltip {
+    position: fixed;
+    pointer-events: none;
+    background: var(--bg);
+    border: 0.5px solid var(--border2);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+    font-size: 11px;
+    color: var(--text);
+    min-width: 190px;
+    max-width: 230px;
+    max-height: 80vh;
+    display: none;
+    z-index: 100;
+    box-shadow: 0 4px 16px rgba(0,0,0,.10);
+    overflow: hidden;
+    display: none;
+    flex-direction: column;
+  }
+  #tooltip.visible { display: flex; }
+  .tt-date {
+    font-size: 11px;
+    color: var(--text2);
+    margin-bottom: 6px;
+    font-weight: 500;
+    padding-bottom: 5px;
+    border-bottom: 0.5px solid var(--border);
+    flex-shrink: 0;
+  }
+  #tt-rows {
+    overflow-y: auto;
+    flex: 1;
+  }
+  .tt-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 3px 0;
+    border-bottom: 0.5px solid var(--border);
+  }
+  .tt-row:last-child { border-bottom: none; }
+  .tt-left  { display: flex; align-items: flex-start; gap: 5px; flex: 1; min-width: 0; }
+  .tt-dot   { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; margin-top: 3px; }
+  .tt-info  { flex: 1; min-width: 0; }
+  .tt-name  { color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tt-cats  { display: flex; gap: 5px; margin-top: 2px; flex-wrap: wrap; }
+  .tt-cat   { font-size: 10px; color: var(--text3); }
+  .tt-cat span { color: var(--text2); }
+  .tt-right { text-align: right; flex-shrink: 0; }
+  .tt-pts   { font-weight: 500; }
+  .tt-delta { font-size: 10px; color: var(--text3); }
+
+  .footer {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--text3);
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <h1>⚽ VM 2026 – Tippekonkurranse</h1>
+  <p class="subtitle" id="subtitle">Laster data…</p>
+
+  <div id="tooltip">
+    <div class="tt-date" id="tt-date"></div>
+    <div id="tt-rows"></div>
+  </div>
+
+  <div class="main-layout">
+    <div id="cards" class="cards"></div>
+
+    <div class="chart-card">
+    <div class="chart-header">
+      <span class="chart-title">Kumulative poeng</span>
+      <div class="legend" id="legend"></div>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="chart"
+        role="img"
+        aria-label="Linjegraf med kumulative poeng per deltaker gjennom VM 2026">
+      </canvas>
+    </div>
+    </div>
+  </div><!-- /main-layout -->
+
+  <div class="footer">
+    <span id="updated"></span>
+    <span>Maks 391 poeng totalt</span>
+  </div>
+
+</div>
+<script>
+// ─── KONFIG ───────────────────────────────────────────────────────
+const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbyWAAZl5obPRHd6XIJHbbcRh0Wpud6Hl9KaUXFJzyX3S1pvoA0dHJ2BzjMI0zz8WIqn/exec';
+const MAKS_POENG = 391;
+
+const PALETTE = [
+  '#378ADD','#1D9E75','#D85A30','#7F77DD','#BA7517',
+  '#D4537E','#639922','#888780','#185FA5','#0F6E56',
+  '#C44B9A','#3DAE9E','#E07B39','#6152A3','#4E8C2F',
+];
+const MEDALS = ['🥇','🥈','🥉'];
+
+const fargeMap = {};
+function farge(navn) {
+  if (!fargeMap[navn]) {
+    fargeMap[navn] = PALETTE[Object.keys(fargeMap).length % PALETTE.length];
+  }
+  return fargeMap[navn];
+}
+
+// ─── HENT DATA ─────────────────────────────────────────────────────
+async function hentData() {
+  if (WEBAPP_URL === 'DIN_WEBAPP_URL_HER') return demoData();
+  try {
+    const res = await fetch(WEBAPP_URL + '?t=' + Date.now());
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return await res.json();
+  } catch(e) {
+    console.error('Feil:', e);
+    return null;
+  }
+}
+
+function demoData() {
+  const start = new Date('2026-06-11');
+  const today = new Date();
+  const days  = Math.min(Math.round((today - start) / 86400000), 38);
+  const deltakere = ['Rune','Kari','Lars','Ingrid','Per','Jonas'];
+  const seeds = [7,3,11,5,9,13];
+  const datoer = [], kumulativt = {}, kategorier = {};
+  deltakere.forEach(d => { kumulativt[d] = []; kategorier[d] = []; });
+
+  for (let i = 0; i <= days; i++) {
+    const d = new Date(start); d.setDate(d.getDate() + i);
+    datoer.push(d.toISOString().slice(0,10));
+    deltakere.forEach((navn, ni) => {
+      const prev  = i === 0 ? 0 : kumulativt[navn][i-1];
+      const add   = i === 0 ? 0 : Math.floor(Math.abs(Math.sin(i * seeds[ni]) * 6));
+      kumulativt[navn].push(prev + add);
+      const k = Math.floor(add * 0.6), t = Math.floor(add * 0.2),
+            s = Math.floor(add * 0.1), b = add - k - t - s;
+      kategorier[navn].push({ kamper: k, tabell: t, sluttspill: s, bonus: b });
+    });
+  }
+
+  const rangering = deltakere
+    .map(navn => {
+      const siste = kategorier[navn].at(-1) || {};
+      return { navn, poeng: kumulativt[navn].at(-1) || 0, ...siste };
+    })
+    .sort((a,b) => b.poeng - a.poeng);
+
+  return { oppdatert: new Date().toISOString(), startDato: '2026-06-11',
+           datoer, deltakere, kumulativt, kategorier, rangering, _demo: true };
+}
+
+function fmtDato(iso) {
+  const [y,m,d] = iso.split('-').map(Number);
+  return new Date(y,m-1,d).toLocaleDateString('no-NO', { day:'numeric', month:'short' });
+}
+
+// ─── KORT ──────────────────────────────────────────────────────────
+function sistKategori(navn, data) {
+  const kats = data.kategorier && data.kategorier[navn];
+  if (!kats) return { kamper: 0, tabell: 0, sluttspill: 0, bonus: 0 };
+  for (let i = kats.length - 1; i >= 0; i--) {
+    const k = kats[i];
+    if (k && (k.kamper > 0 || k.tabell > 0 || k.sluttspill > 0 || k.bonus > 0)) return k;
+  }
+  return { kamper: 0, tabell: 0, sluttspill: 0, bonus: 0 };
+}
+
+function byggKort(rangering, data) {
+  const container = document.getElementById('cards');
+  container.innerHTML = '';
+  rangering.forEach((r, i) => {
+    const pst      = Math.round(r.poeng / MAKS_POENG * 100);
+    const kat      = sistKategori(r.navn, data);
+    const kamper   = kat.kamper     ?? 0;
+    const tabell   = kat.tabell     ?? 0;
+    const slutt    = kat.sluttspill ?? 0;
+    const bonus    = kat.bonus      ?? 0;
+    const f        = farge(r.navn);
+
+    // Bygg tooltip-rader – vis kun kategorier med poeng
+    const katRader = [
+      { label: '⚽ Kampresultater', val: kamper },
+      { label: '📊 Tabellplasseringer', val: tabell },
+      { label: '🏆 Sluttspill', val: slutt },
+      { label: '❓ Bonus', val: bonus },
+    ]
+    .filter(k => k.val > 0)
+    .map(k => `<div class="card-tooltip-row">
+        <span>${k.label}</span>
+        <span class="card-tooltip-val">${k.val}p</span>
+      </div>`)
+    .join('');
+
+    const ingenPoeng = katRader === ''
+      ? '<div class="card-tooltip-row" style="color:var(--text3)"><span>Ingen poeng ennå</span></div>'
+      : '';
+
+    const c = document.createElement('div');
+    c.className = 'card';
+    c.innerHTML = `
+      ${i < 3 ? `<span class="medal">${MEDALS[i]}</span>` : `<div class="card-rank">${i+1}.</div>`}
+      <div class="card-name">${r.navn}</div>
+      <div class="card-pts">${r.poeng}<span>p</span></div>
+      <div class="card-max">${pst}% av maks</div>
+      <div class="card-bar">
+        <div class="card-bar-fill" style="width:${pst}%;background:${f}"></div>
+      </div>
+      <div class="card-cats">
+        <span class="cat-badge">⚽ ${kamper}p</span>
+        <span class="cat-badge">📊 ${tabell}p</span>
+        <span class="cat-badge">🏆 ${slutt}p</span>
+        ${bonus > 0 ? `<span class="cat-badge">❓ ${bonus}p</span>` : ''}
+      </div>
+      <div class="card-tooltip">
+        <div class="card-tooltip-title">
+          <div class="card-tooltip-dot" style="background:${f}"></div>
+          ${r.navn}
+        </div>
+        ${katRader}
+        ${ingenPoeng}
+        <div class="card-tooltip-row">
+          <span>Totalt</span>
+          <span class="card-tooltip-val">${r.poeng}p av ${MAKS_POENG}p</span>
+        </div>
+      </div>`;
+    container.appendChild(c);
+  });
+}
+
+// ─── GRAF ──────────────────────────────────────────────────────────
+let chart = null;
+const muted = new Set();
+
+function byggGraf(data) {
+  const labels   = data.datoer.map(fmtDato);
+  const datasets = data.deltakere.map(navn => ({
+    label:                     navn,
+    data:                      data.kumulativt[navn],
+    borderColor:               farge(navn),
+    backgroundColor:           farge(navn),
+    borderWidth:               2,
+    pointRadius:               0,
+    pointHoverRadius:          6,
+    pointHoverBackgroundColor: farge(navn),
+    pointHoverBorderColor:     '#fff',
+    pointHoverBorderWidth:     2,
+    tension:                   0.3,
+    fill:                      false,
+  }));
+
+  if (chart) chart.destroy();
+
+  chart = new Chart(document.getElementById('chart'), {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { display: false }, tooltip: { enabled: false } },
+      scales: {
+        x: {
+          ticks: { color:'#888780', font:{ size:11 }, maxTicksLimit: Math.min(labels.length, 14), maxRotation: 35 },
+          grid:  { color:'rgba(136,135,128,.10)' },
+        },
+        y: {
+          beginAtZero: true, max: MAKS_POENG,
+          ticks: { color:'#888780', font:{ size:11 }, stepSize: 50 },
+          grid:  { color:'rgba(136,135,128,.10)' },
+          title: { display: true, text: 'Poeng', color:'#888780', font:{ size:11 } },
+        },
+      },
+    },
+    plugins: [{
+      id: 'crosshair',
+      afterDraw(c) {
+        if (c._hx == null) return;
+        const { ctx, chartArea: { top, bottom } } = c;
+        ctx.save();
+        ctx.beginPath(); ctx.moveTo(c._hx, top); ctx.lineTo(c._hx, bottom);
+        ctx.strokeStyle = 'rgba(136,135,128,.3)'; ctx.lineWidth = 1;
+        ctx.setLineDash([4,3]); ctx.stroke(); ctx.restore();
+      },
+    }],
+  });
+
+  // ─── MOUSEOVER med detaljert tooltip ───────────────────────────
+  const canvas  = document.getElementById('chart');
+  const tooltip = document.getElementById('tooltip');
+
+  canvas.addEventListener('mousemove', evt => {
+    const pts = chart.getElementsAtEventForMode(evt, 'index', { intersect: false }, false);
+    if (!pts.length) {
+      tooltip.classList.remove('visible'); chart._hx = null; chart.update('none'); return;
+    }
+
+    const idx    = pts[0].index;
+    chart._hx    = pts[0].element.x;
+    chart.update('none');
+
+    document.getElementById('tt-date').textContent = labels[idx];
+
+    // Sorter etter poeng på denne datoen
+    const sorted = data.deltakere
+      .map(navn => {
+        const poeng   = data.kumulativt[navn][idx] || 0;
+        const forrige = idx > 0 ? (data.kumulativt[navn][idx-1] || 0) : 0;
+        const kat     = (data.kategorier && data.kategorier[navn]) ? data.kategorier[navn][idx] : null;
+        return { navn, poeng, delta: poeng - forrige, kat, farge: farge(navn) };
+      })
+      .sort((a,b) => b.poeng - a.poeng);
+
+    document.getElementById('tt-rows').innerHTML = sorted.map((d, rank) => {
+      // Kategoribadges – vis kun hvis vi har data og minst én er > 0
+      let katHTML = '';
+      if (d.kat) {
+        const cats = [
+          { label: '⚽ kamper', val: d.kat.kamper },
+          { label: '📊 tabell', val: d.kat.tabell },
+          { label: '🏆 sluttspill', val: d.kat.sluttspill },
+          { label: '❓ bonus', val: d.kat.bonus },
+        ].filter(c => c.val > 0);
+
+        if (cats.length > 0) {
+          katHTML = `<div class="tt-cats">
+            ${cats.map(c => `<span class="tt-cat">${c.label}: <span>${c.val}p</span></span>`).join('')}
+          </div>`;
+        }
+      }
+
+      return `<div class="tt-row">
+        <div class="tt-left">
+          <div class="tt-dot" style="background:${d.farge}"></div>
+          <div class="tt-info">
+            <div class="tt-name">${rank+1}. ${d.navn}</div>
+            ${katHTML}
+          </div>
+        </div>
+        <div class="tt-right">
+          <div class="tt-pts">${d.poeng}p</div>
+          ${d.delta > 0 ? `<div class="tt-delta">+${d.delta} i dag</div>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+
+    tooltip.classList.add('visible');
+    const ttW = tooltip.offsetWidth  || 220;
+    const ttH = tooltip.offsetHeight || 180;
+    const pad = 14;
+    let left  = evt.clientX + pad;
+    let top   = evt.clientY - ttH / 2;
+    if (left + ttW > window.innerWidth  - pad) left = evt.clientX - ttW - pad;
+    if (top < 8)                               top  = 8;
+    if (top + ttH > window.innerHeight  - 8)  top  = window.innerHeight - ttH - 8;
+    tooltip.style.left = left + 'px';
+    tooltip.style.top  = top  + 'px';
+  });
+
+  canvas.addEventListener('mouseleave', () => {
+    tooltip.classList.remove('visible'); chart._hx = null; chart.update('none');
+  });
+
+  // Legende
+  const legend = document.getElementById('legend');
+  legend.innerHTML = '';
+  data.deltakere.forEach((navn, i) => {
+    const item = document.createElement('div');
+    item.className = 'legend-item';
+    item.innerHTML = `<div class="legend-dot" style="background:${farge(navn)}"></div>${navn}`;
+    item.addEventListener('click', () => {
+      if (muted.has(i)) { muted.delete(i); item.classList.remove('muted'); chart.show(i); }
+      else              { muted.add(i);    item.classList.add('muted');    chart.hide(i); }
+    });
+    legend.appendChild(item);
+  });
+}
+
+// ─── INIT ──────────────────────────────────────────────────────────
+(async () => {
+  const data = await hentData();
+  if (!data) {
+    document.getElementById('subtitle').textContent = '';
+    document.getElementById('cards').innerHTML =
+      '<p style="color:#c0392b;padding:20px">Kunne ikke laste data. Sjekk WEBAPP_URL.</p>';
+    return;
+  }
+
+  // Pre-tildel farger i rangert rekkefølge
+  data.rangering.forEach(r => farge(r.navn));
+
+  byggKort(data.rangering, data);
+  byggGraf(data);
+
+  const oppdatert = new Date(data.oppdatert).toLocaleString('no-NO', {
+    day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'
+  });
+  document.getElementById('subtitle').textContent =
+    (data._demo ? 'Demo-data – ' : '') + 'Oppdateres automatisk hvert 30. minutt';
+  document.getElementById('updated').textContent = 'Sist oppdatert: ' + oppdatert;
+
+  setTimeout(() => location.reload(), 5 * 60 * 1000);
+})();
+</script>
+</body>
+</html>
