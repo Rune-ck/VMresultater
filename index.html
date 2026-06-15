@@ -63,6 +63,22 @@
     flex-direction: column;
     gap: 6px;
   }
+  .card.card-skjult { display: none !important; }
+  .cards.ekspandert .card.card-skjult { display: grid !important; }
+  .ekspander-btn {
+    width: 100%;
+    background: none;
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text2);
+    font-size: 12px;
+    padding: 8px;
+    cursor: pointer;
+    text-align: center;
+    margin-top: 2px;
+    transition: background .12s;
+  }
+  .ekspander-btn:hover { background: var(--bg2); }
   .card {
     background: var(--bg);
     border: 0.5px solid var(--border);
@@ -588,8 +604,26 @@ function byggKort(rangering, data) {
           <span class="card-tooltip-val">${r.poeng}p av ${MAKS_POENG}p</span>
         </div>
       </div>`;
+    // Skjul kort utover topp 7
+    if (i >= 7) c.classList.add('card-skjult');
     container.appendChild(c);
   });
+
+  // Legg til ekspander-knapp hvis mer enn 7 deltakere
+  if (rangering.length > 7) {
+    const btn = document.createElement('button');
+    btn.className = 'ekspander-btn';
+    btn.id = 'ekspander-btn';
+    const skjulte = rangering.length - 7;
+    btn.textContent = `Vis alle ${rangering.length} deltakere ↓`;
+    btn.addEventListener('click', () => {
+      const ekspandert = container.classList.toggle('ekspandert');
+      btn.textContent = ekspandert
+        ? 'Vis færre ↑'
+        : `Vis alle ${rangering.length} deltakere ↓`;
+    });
+    container.appendChild(btn);
+  }
 }
 
 // ─── GRAF ──────────────────────────────────────────────────────────
