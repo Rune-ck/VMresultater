@@ -9,28 +9,16 @@
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   :root {
-    --bg:      #ffffff;
-    --bg2:     #f5f4f0;
-    --bg3:     #eeedea;
-    --text:    #1a1a18;
-    --text2:   #5f5e5a;
-    --text3:   #888780;
-    --border:  rgba(0,0,0,.10);
-    --border2: rgba(0,0,0,.20);
+    --bg:      #1a1a18;
+    --bg2:     #242422;
+    --bg3:     #2e2e2b;
+    --text:    #f0ede6;
+    --text2:   #b8b5ad;
+    --text3:   #8f8c85;
+    --border:  rgba(255,255,255,.10);
+    --border2: rgba(255,255,255,.20);
     --radius:  10px;
     --rsm:     6px;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg:      #1a1a18;
-      --bg2:     #242422;
-      --bg3:     #2e2e2b;
-      --text:    #e8e6df;
-      --text2:   #9c9a92;
-      --text3:   #6b6963;
-      --border:  rgba(255,255,255,.10);
-      --border2: rgba(255,255,255,.20);
-    }
   }
 
   body {
@@ -223,11 +211,10 @@
     max-width: 230px;
     max-height: 80vh;
     display: none;
+    flex-direction: column;
     z-index: 100;
     box-shadow: 0 4px 16px rgba(0,0,0,.10);
     overflow: hidden;
-    display: none;
-    flex-direction: column;
   }
   #tooltip.visible { display: flex; }
   .tt-date {
@@ -242,6 +229,9 @@
   #tt-rows {
     overflow-y: auto;
     flex: 1;
+    max-height: 60vh;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border2) transparent;
   }
   .tt-row {
     display: flex;
@@ -436,7 +426,7 @@
 </div>
 <script>
 // ─── KONFIG ───────────────────────────────────────────────────────
-const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbyWAAZl5obPRHd6XIJHbbcRh0Wpud6Hl9KaUXFJzyX3S1pvoA0dHJ2BzjMI0zz8WIqn/exec';
+const WEBAPP_URL = 'DIN_WEBAPP_URL_HER';
 const MAKS_POENG = 391;
 
 const PALETTE = [
@@ -608,7 +598,7 @@ function byggGraf(data) {
     pointHoverBackgroundColor: farge(navn),
     pointHoverBorderColor:     '#fff',
     pointHoverBorderWidth:     2,
-    tension:                   0.1,
+    tension:                   0,
     fill:                      false,
   }));
 
@@ -624,7 +614,7 @@ function byggGraf(data) {
       scales: {
         x: {
           ticks: {
-            color: '#888780',
+            color: '#a8a5a0',
             font:  { size: 11 },
             maxTicksLimit: 14,
             maxRotation: 35,
@@ -643,9 +633,9 @@ function byggGraf(data) {
         },
         y: {
           beginAtZero: false,
-          ticks: { color:'#888780', font:{ size:11 } },
-          grid:  { color:'rgba(136,135,128,.10)' },
-          title: { display: true, text: 'Poeng', color:'#888780', font:{ size:11 } },
+          ticks: { color:'#a8a5a0', font:{ size:11 } },
+          grid:  { color:'rgba(180,177,170,.08)' },
+          title: { display: true, text: 'Poeng', color:'#a8a5a0', font:{ size:11 } },
         },
       },
     },
