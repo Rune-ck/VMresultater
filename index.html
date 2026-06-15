@@ -9,16 +9,28 @@
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   :root {
-    --bg:      #1a1a18;
-    --bg2:     #242422;
-    --bg3:     #2e2e2b;
-    --text:    #f0ede6;
-    --text2:   #b8b5ad;
-    --text3:   #8f8c85;
-    --border:  rgba(255,255,255,.10);
-    --border2: rgba(255,255,255,.20);
+    --bg:      #ffffff;
+    --bg2:     #FCFAEE;
+    --bg3:     #eeedea;
+    --text:    #1a1a18;
+    --text2:   #5f5e5a;
+    --text3:   #888780;
+    --border:  rgba(0,0,0,.10);
+    --border2: rgba(0,0,0,.20);
     --radius:  10px;
     --rsm:     6px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:      #1a1a18;
+      --bg2:     #242422;
+      --bg3:     #2e2e2b;
+      --text:    #e8e6df;
+      --text2:   #9c9a92;
+      --text3:   #6b6963;
+      --border:  rgba(255,255,255,.10);
+      --border2: rgba(255,255,255,.20);
+    }
   }
 
   body {
@@ -200,7 +212,7 @@
   /* ── TOOLTIP ── */
   #tooltip {
     position: fixed;
-    pointer-events: none;
+    pointer-events: auto;
     background: var(--bg);
     border: 0.5px solid var(--border2);
     border-radius: var(--radius);
@@ -461,8 +473,8 @@ function demoData() {
   const start = new Date('2026-06-11');
   const today = new Date();
   const days  = Math.min(Math.round((today - start) / 86400000), 38);
-  const deltakere = ['Rune','Kari','Lars','Ingrid','Per','Jonas'];
-  const seeds = [7,3,11,5,9,13];
+  const deltakere = ['Rune','Kari','Lars','Ingrid','Per','Jonas','Marte','Erik','Sofie','Ole','Linn','Thomas','Anna','Petter','Ida','Henrik','Camilla','Bjørn'];
+  const seeds = [7,3,11,5,9,13,2,17,6,4,8,15,10,12,1,19,16,14];
   const datoer = [], kumulativt = {}, kategorier = {};
   deltakere.forEach(d => { kumulativt[d] = []; kategorier[d] = []; });
 
@@ -614,7 +626,7 @@ function byggGraf(data) {
       scales: {
         x: {
           ticks: {
-            color: '#a8a5a0',
+            color: '#888780',
             font:  { size: 11 },
             maxTicksLimit: 14,
             maxRotation: 35,
@@ -633,9 +645,9 @@ function byggGraf(data) {
         },
         y: {
           beginAtZero: false,
-          ticks: { color:'#a8a5a0', font:{ size:11 } },
-          grid:  { color:'rgba(180,177,170,.08)' },
-          title: { display: true, text: 'Poeng', color:'#a8a5a0', font:{ size:11 } },
+          ticks: { color:'#888780', font:{ size:11 } },
+          grid:  { color:'rgba(136,135,128,.10)' },
+          title: { display: true, text: 'Poeng', color:'#888780', font:{ size:11 } },
         },
       },
     },
@@ -720,20 +732,60 @@ function byggGraf(data) {
     }).join('');
 
     tooltip.classList.add('visible');
-    const ttW = tooltip.offsetWidth  || 220;
-    const ttH = tooltip.offsetHeight || 180;
-    const pad = 14;
-    let left  = evt.clientX + pad;
-    let top   = evt.clientY - ttH / 2;
-    if (left + ttW > window.innerWidth  - pad) left = evt.clientX - ttW - pad;
-    if (top < 8)                               top  = 8;
-    if (top + ttH > window.innerHeight  - 8)  top  = window.innerHeight - ttH - 8;
-    tooltip.style.left = left + 'px';
-    tooltip.style.top  = top  + 'px';
+
+    if (!tooltip._fryst) {
+      const ttW = tooltip.offsetWidth  || 220;
+      const ttH = tooltip.offsetHeight || 180;
+      const pad = 14;
+      let left  = evt.clientX + pad;
+      let top   = evt.clientY - ttH / 2;
+      if (left + ttW > window.innerWidth  - pad) left = evt.clientX - ttW - pad;
+      if (top < 8)                               top  = 8;
+      if (top + ttH > window.innerHeight  - 8)  top  = window.innerHeight - ttH - 8;
+      tooltip.style.left = left + 'px';
+      tooltip.style.top  = top  + 'px';
+    }
   });
 
   canvas.addEventListener('mouseleave', () => {
-    tooltip.classList.remove('visible'); chart._hx = null; chart.update('none');
+    if (!tooltip._fryst && !tooltip.matches(':hover')) {
+      tooltip.classList.remove('visible');
+      chart._hx = null;
+      chart.update('none');
+    }
+  });
+
+  tooltip.addEventListener('mouseleave', () => {
+    if (!tooltip._fryst) {
+      tooltip.classList.remove('visible');
+      chart._hx = null;
+      chart.update('none');
+    }
+  });
+
+  // Klikk på datapunkt i grafen = frys/opphev tooltip
+  canvas.addEventListener('click', (evt) => {
+    const pts = chart.getElementsAtEventForMode(evt, 'index', { intersect: false }, false);
+    if (!pts.length) return;
+
+    if (tooltip._fryst) {
+      tooltip._fryst = false;
+      tooltip.style.outline = 'none';
+    } else if (tooltip.classList.contains('visible')) {
+      tooltip._fryst = true;
+      tooltip.style.outline = '1.5px solid var(--border2)';
+    }
+  });
+
+  // Klikk utenfor grafen og tooltip = opphev frys
+  document.addEventListener('click', (evt) => {
+    if (!canvas.contains(evt.target) && !tooltip.contains(evt.target)) {
+      tooltip._fryst = false;
+      tooltip.style.outline = 'none';
+      tooltip.classList.remove('visible');
+      chart._hx = null;
+      chart.update('none');
+    }
   });
 
   // Legende
