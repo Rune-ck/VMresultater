@@ -454,7 +454,7 @@
 </div>
 <script>
 // ─── KONFIG ───────────────────────────────────────────────────────
-const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbyWAAZl5obPRHd6XIJHbbcRh0Wpud6Hl9KaUXFJzyX3S1pvoA0dHJ2BzjMI0zz8WIqn/exec';
+const WEBAPP_URL = 'DIN_WEBAPP_URL_HER';
 const MAKS_POENG = 391;
 
 const PALETTE = [
@@ -760,7 +760,8 @@ function byggGraf(data) {
         </div>
         <div class="tt-right">
           <div class="tt-pts">${d.poeng}p</div>
-          ${d.delta > 0 ? `<div class="tt-delta">+${d.delta} i dag</div>` : ''}
+          ${d.delta > 0 ? `<div class="tt-delta" style="color:#1a7f50">+${d.delta}</div>` : ''}
+          ${d.delta < 0 ? `<div class="tt-delta" style="color:#c0392b">${d.delta}</div>` : ''}
         </div>
       </div>`;
     }).join('');
